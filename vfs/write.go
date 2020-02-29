@@ -211,8 +211,7 @@ func (fh *WriteFileHandle) close() (err error) {
 	fh.closed = true
 	// leave writer open until file is transferred
 	defer func() {
-		fh.file.delWriter(fh, false)
-		fh.file.finishWriterClose()
+		fh.file.delWriter(fh)
 	}()
 	// If file not opened and not safe to truncate then then leave file intact
 	if !fh.opened && !fh.safeToTruncate() {
