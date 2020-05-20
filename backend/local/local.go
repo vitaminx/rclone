@@ -809,6 +809,10 @@ func (o *Object) Hash(ctx context.Context, r hash.Type) (string, error) {
 		} else {
 			in, err = o.openTranslatedLink(0, -1)
 		}
+		// If not checking for updates, only read size given
+		if o.fs.opt.NoCheckUpdated {
+			in = readers.NewLimitedReadCloser(in, o.size)
+		}
 		if err != nil {
 			return "", errors.Wrap(err, "hash: failed to open")
 		}
@@ -953,6 +957,13 @@ func (o *Object) Open(ctx context.Context, options ...fs.OpenOption) (in io.Read
 				fs.Logf(o, "Unsupported mandatory option: %v", option)
 			}
 		}
+	}
+
+	// If not checking updated then limit to current size.  This means if
+	// file is being extended, readers will read a o.Size() bytes rather
+	// than the new size making for a consistent upload.
+	if limit < 0 && o.fs.opt.NoCheckUpdated {
+		limit = o.size
 	}
 
 	// Handle a translated link
@@ -1151,6 +1162,10 @@ func (f *Fs) OpenWriterAt(ctx context.Context, remote string, size int64) (fs.Wr
 
 // setMetadata sets the file info from the os.FileInfo passed in
 func (o *Object) setMetadata(info os.FileInfo) {
+	// if not checking updated then don't update the stat
+	if o.fs.opt.NoCheckUpdated && !o.modTime.IsZero() {
+		return
+	}
 	// Don't overwrite the info if we don't need to
 	// this avoids upsetting the race detector
 	if o.size != info.Size() {
